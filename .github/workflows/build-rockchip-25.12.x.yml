@@ -95,15 +95,6 @@ on:
         required: false
         type: boolean
         default: false
-      include_docker:
-        description: |
-          是否编译 Docker 插件
-        required: true
-        default: 'no'
-        type: choice
-        options:
-          - 'yes'
-          - 'no'
       enable_pppoe:
         description: "是否配置PPPoE拨号信息?"
         required: true
@@ -131,8 +122,8 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set executable permissions
-        run: chmod +x ${{ github.workspace }}/rockchip/build24.sh
-      
+        run: chmod +x ${{ github.workspace }}/rockchip/build25.sh
+
       - name: Save Custom Router IP into OpenWrt files
         run: |
           mkdir -p "${{ github.workspace }}/custom"
@@ -157,18 +148,9 @@ jobs:
           else
             echo "❎ 未启用 luci-app-store"
           fi
-      - name: Check Docker
-        run: |
-          if [[ "${{ inputs.include_docker }}" == "yes" ]]; then
-             echo 'CUSTOM_PACKAGES="$CUSTOM_PACKAGES docker"' >> shell/custom-packages.sh
-             echo "✅ 已为Rockchip平台补充 docker 组件"
-          fi
-      
-
       - name: Building Rockchip ImmortalWrt 25.12.x
         run: |
           profile="${{ github.event.inputs.profile }}"
-          include_docker="${{ github.event.inputs.include_docker }}"
           rootfs_partsize="${{ github.event.inputs.rootfs_partsize }}"
           luci_version="${{ github.event.inputs.luci_version }}"
           echo "Building for profile: $profile"
@@ -182,14 +164,12 @@ jobs:
               -v "${{ github.workspace }}/shell:/home/build/immortalwrt/shell" \
               -v "${{ github.workspace }}/rockchip/build25.sh:/home/build/immortalwrt/build.sh" \
               -e PROFILE=$profile \
-              -e INCLUDE_DOCKER=$include_docker \
               -e ROOTFS_PARTSIZE=$rootfs_partsize \
               -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
               -e PPPOE_ACCOUNT=${{ inputs.pppoe_account }} \
               -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
           immortalwrt/imagebuilder:rockchip-armv8-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
-        
-    
+
       - name: Create info
         run: |
           cat > ${{ github.workspace }}/router-info.md <<EOF
@@ -199,14 +179,9 @@ jobs:
           - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
           - 👤 **用户名**: root
           - 🔑 **密码**: 无
-          EOF
 
-          if [ "${{ github.event.inputs.include_docker }}" == "yes" ]; then
-            extra_content="#### 默认带docker"
-            echo -e "\n$extra_content" >> ${{ github.workspace }}/router-info.md
-          else
-            echo -e "\n#### 不带docker" >> ${{ github.workspace }}/router-info.md
-          fi
+          #### 不带 Docker
+          EOF
 
       - name: Upload ImmortWrt as release assets
         uses: softprops/action-gh-release@v3

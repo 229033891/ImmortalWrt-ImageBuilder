@@ -9,7 +9,6 @@
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES adguardhome luci-app-adguardhome"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-samba4 luci-i18n-samba4-zh-cn samba4-server samba4-utils"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-tailscale-community luci-i18n-tailscale-community-zh-cn tailscale"
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES easytier luci-app-easytier"
 # OpenVPN 仅客户端（引擎 + LuCI）；不集成 luci-app-openvpn-server（25.12 配置冲突）
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES openvpn-openssl luci-app-openvpn luci-i18n-openvpn-zh-cn"
 # Cloudflare Tunnel 兜底（刷机后在 LuCI 绑定 token，勿把密钥写入仓库）
