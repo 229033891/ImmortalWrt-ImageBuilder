@@ -1,7 +1,6 @@
-# 此工作流是为了构建一个immortalwrt固件的安装器 格式为iso 可用于所有的虚拟机 和 物理机
-# 所谓安装器就是用来安装用的 iso引导的是一个启动速度极快的debian live系统 跑码后输入命令 ddd 即可调出安装菜单
-# 安装时 若是多张硬盘 你可以选择 需要安装的硬盘 此类方法安装的openwrt 安装后是有剩余空间的 更多信息请参考 wukongdaily/img-installer 项目
-# 几乎所有linux 都有各自的安装器 唯独openwrt和armbian 没有, 希望此工作流 弥补这个遗憾 让你更优雅的 安装openwrt 
+# 构建 ImmortalWrt x86-64 安装 ISO（Debian Live + ddd 安装菜单）
+# 内嵌固件与「Build 25.12.x x86-64」同源（含 files/ 定制），安装后可使用更大磁盘剩余空间
+# 参考：wukongdaily/img-installer
 
 name: Build 25.12.x ISO x86-64
 
@@ -18,31 +17,27 @@ on:
           - 25.12.0-rc2
           - 25.12.0
           - 25.12.1
-      profile:
-        description: '请输入要编译固件大小 单位(MB)'
+      custom_router_ip:
+        description: "请设置路由器的管理地址(仅对多网口路由器有效) 格式:192.168.x.1 或 10.x.x.1"
         required: true
-        default: '1024'
+        default: "192.168.100.1"
+      profile:
+        description: "请输入要编译固件大小 单位(MB)"
+        required: true
+        default: "1024"
       enable_store:
         description: "集成 store 商店"
         required: false
         type: boolean
         default: false
-      include_docker:
-        description: "是否编译 Docker 插件"
-        required: true
-        default: 'yes'
-        type: choice
-        options:
-          - 'yes'
-          - 'no'
       enable_pppoe:
         description: "是否配置PPPoE拨号信息?"
         required: true
-        default: 'no'
+        default: "no"
         type: choice
         options:
-          - 'yes'
-          - 'no'
+          - "yes"
+          - "no"
       pppoe_account:
         description: "宽带账号 (若启用PPPoE)"
         required: false
@@ -63,15 +58,22 @@ jobs:
 
       - name: Set executable permissions
         run: chmod +x ${{ github.workspace }}/x86-64/build25.sh
-      
+
+      - name: Save Custom Router IP into OpenWrt files
+        run: |
+          mkdir -p "${{ github.workspace }}/custom"
+          echo "${{ github.event.inputs.custom_router_ip }}" > "${{ github.workspace }}/custom/custom_router_ip.txt"
+          echo "您设置的路由器管理地址是:${{ github.event.inputs.custom_router_ip }}"
+
       - name: Validate PPPoE Inputs
         run: |
-          if [[ "${{ github.event.inputs.enable_pppoe }}" == "yes" ]]; then
-            if [[ -z "${{ github.event.inputs.pppoe_account }}" || -z "${{ github.event.inputs.pppoe_password }}" ]]; then
+          if [[ "${{ inputs.enable_pppoe }}" == "yes" ]]; then
+            if [[ -z "${{ inputs.pppoe_account }}" || -z "${{ inputs.pppoe_password }}" ]]; then
               echo "Error: PPPoE account and password must be provided when PPPoE is enabled!"
               exit 1
             fi
           fi
+
       - name: Enable Store integration
         run: |
           if [ "${{ github.event.inputs.enable_store }}" == "true" ]; then
@@ -81,10 +83,9 @@ jobs:
             echo "❎ 未启用 luci-app-store"
           fi
 
-      - name: ✅ 正在构建ImmortalWrt固件25.12.x
+      - name: Build ImmortalWrt-x86-64-efi 25.12.x
         run: |
           profile="${{ github.event.inputs.profile }}"
-          include_docker="${{ github.event.inputs.include_docker }}"
           luci_version="${{ github.event.inputs.luci_version }}"
           echo "Building for profile: $profile"
           docker run --rm -i \
@@ -96,22 +97,44 @@ jobs:
             -v "${{ github.workspace }}/shell:/home/build/immortalwrt/shell" \
             -v "${{ github.workspace }}/x86-64/build25.sh:/home/build/immortalwrt/build.sh" \
             -e PROFILE=$profile \
-            -e INCLUDE_DOCKER=$include_docker \
             -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
             -e PPPOE_ACCOUNT=${{ inputs.pppoe_account }} \
             -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
-          immortalwrt/imagebuilder:x86-64-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
+            immortalwrt/imagebuilder:x86-64-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
 
-      - name: ✅ 复制固件到根目录
+      - name: Copy firmware for ISO packaging
         run: |
-          cp ${{ github.workspace }}/bin/targets/x86/64/*squashfs-combined-efi.img.gz ${{ github.workspace }}
+          cp ${{ github.workspace }}/bin/targets/x86/64/*squashfs-combined-efi.img.gz ${{ github.workspace }}/
 
-      - name: ✅ 上传固件到 artifact (for ISO generation)
+      - name: Upload firmware artifact
         uses: actions/upload-artifact@v6
         with:
           name: firmware-img
           path: |
             *.img.gz
+
+      - name: Create info
+        run: |
+          cat > ${{ github.workspace }}/router-info.md <<EOF
+          ## 📡 路由器后台信息（ISO 安装器）
+          <a href="https://wkdaily.cpolar.cn/archives/1">
+           <img src="https://img.shields.io/badge/若下载慢可套用国内加速站下载-FC7C0D?logo=github&logoColor=fff&labelColor=000&style=for-the-badge"/>
+          </a>
+
+          - 💿 **产物**: custom-installer-x86_64.iso（启动后执行 \`ddd\` 安装）
+          - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
+          - 👤 **用户名**: root
+          - 🔑 **密码**: password
+          - 📦 **rootfs**: ${{ github.event.inputs.profile }} MB
+
+          #### 不带 Docker
+          EOF
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: router-info
+          path: router-info.md
 
   build_installer_iso:
     runs-on: ubuntu-22.04
@@ -123,27 +146,33 @@ jobs:
         with:
           name: firmware-img
 
-      - name: ⏬ 同步 img-installer 项目 准备制作ISO
-        run: |
-          git clone https://github.com/wukongdaily/img-installer.git
-          cd img-installer
+      - name: Download release notes
+        uses: actions/download-artifact@v7
+        with:
+          name: router-info
 
-      - name: Set executable permissions for scripts
+      - name: Clone img-installer
+        run: git clone --depth=1 https://github.com/wukongdaily/img-installer.git
+
+      - name: Set executable permissions
         run: |
           chmod +x "${{ github.workspace }}/img-installer/custom.sh"
           chmod +x "${{ github.workspace }}/img-installer/supportFiles/custom/build.sh"
 
-      - name: ✅ 制作 25.12.x ISO
+      - name: Build ISO installer
         run: |
           firmware_file=$(ls *squashfs-combined-efi.img.gz)
           cd img-installer
           bash autobuild/autobuild.sh "../$firmware_file"
 
-      - name: 🚀 上传 ISO 到 Release
+      - name: Upload ISO as release asset
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: "Custom-Installer-x86_64-ISO"
-          body_path: "${{ github.workspace }}/img-installer/autobuild/info.md"
+          tag_name: Custom-Installer-x86_64-ISO
+          name: ImmortWrt-x86-64-ISO-Installer
+          body_path: ${{ github.workspace }}/router-info.md
           files: |
             img-installer/output/custom-installer-x86_64.iso
-          token: "${{ secrets.GITHUB_TOKEN }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
