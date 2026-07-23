@@ -155,10 +155,6 @@ elif [ "$easepi_r1" -eq 1 ]; then
     uci set network.wan2.norelease='1'
     uci set network.wan2.multipath='off'
 
-    uci set network.wan2_v6=interface
-    uci set network.wan2_v6.device="$wan2_ifname"
-    uci set network.wan2_v6.proto='dhcpv6'
-
     # Tailscale 占位接口（安装插件后由服务接管）
     uci set network.tailscale=interface
     uci set network.tailscale.proto='none'
@@ -171,7 +167,6 @@ elif [ "$easepi_r1" -eq 1 ]; then
             uci -q delete "firewall.$z.network"
             uci add_list "firewall.$z.network"='wan1'
             uci add_list "firewall.$z.network"='wan2'
-            uci add_list "firewall.$z.network"='wan2_v6'
             uci set "firewall.$z.input"='ACCEPT'
             echo "firewall wan zone -> wan1/wan2, input=ACCEPT" >>$LOGFILE
             break

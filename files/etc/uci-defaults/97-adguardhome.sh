@@ -11,8 +11,9 @@ echo "97-adguardhome.sh at $(date)" >>"$LOGFILE"
 # 关闭 dnsmasq 的 DNS 服务，避免与 AGH 抢 53 端口
 uci -q set dhcp.@dnsmasq[0].port='0'
 
-# 写入 UCI 路径（官方 init 不读取 enabled 选项，仅作 LuCI 展示）
+# ImmortalWrt 的 adguardhome.init 会校验 enabled（默认 0），必须显式置 1
 if [ -f /etc/config/adguardhome ]; then
+	uci -q set adguardhome.config.enabled='1'
 	uci -q set adguardhome.config.config_file='/etc/adguardhome/adguardhome.yaml'
 	uci -q set adguardhome.config.work_dir='/var/lib/adguardhome'
 	uci commit adguardhome

@@ -1,4 +1,5 @@
 config adguardhome 'config'
+	option enabled '1'
 	option config_file '/etc/adguardhome/adguardhome.yaml'
 	option work_dir '/var/lib/adguardhome'
 	option user 'adguardhome'
