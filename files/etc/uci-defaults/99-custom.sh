@@ -60,9 +60,9 @@ case "$board_name" in
         echo "Using $board_name mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
         ;;
     *easepi-r1*|*easepi_r1*)
-        # 对齐现网 ImmortalWrt-shlt：LAN=eth1+eth2，主 WAN=eth5，副 WAN=eth0
+        # EasePi R1：LAN=eth1+eth2，主 WAN=eth3，副 WAN=eth0（对齐官方 eth0–eth3 命名）
         easepi_r1=1
-        wan_ifname="eth5"
+        wan_ifname="eth3"
         wan2_ifname="eth0"
         lan_ifnames="eth1 eth2"
         echo "Using EasePi R1 mapping: WAN1=$wan_ifname WAN2=$wan2_ifname LAN=$lan_ifnames" >>"$LOGFILE"
@@ -125,7 +125,7 @@ elif [ "$easepi_r1" -eq 1 ]; then
     uci -q set dhcp.lan.leasetime='12h'
     echo "EasePi R1 LAN static ${CUSTOM_IP}/24 + DHCP server on" >>$LOGFILE
 
-    # wan1 = eth5（主上行，metric 10）
+    # wan1 = eth3（主上行，metric 10）
     uci set network.wan1=interface
     uci set network.wan1.device="$wan_ifname"
     uci set network.wan1.metric='10'
