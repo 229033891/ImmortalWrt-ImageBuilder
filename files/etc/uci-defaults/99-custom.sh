@@ -3,11 +3,18 @@
 # Log file for debugging
 LOGFILE="/etc/config/uci-defaults-log.txt"
 echo "Starting 99-custom.sh at $(date)" >>$LOGFILE
-# 设置默认防火墙规则，方便单网口虚拟机首次访问 WebUI 
-# 因为本项目中 单网口模式是dhcp模式 直接就能上网并且访问web界面 避免新手每次都要修改/etc/config/network中的静态ip
-# 当你刷机运行后 都调整好了 你完全可以在web页面自行关闭 wan口防火墙的入站数据
-# 具体操作方法：网络——防火墙 在wan的入站数据 下拉选项里选择 拒绝 保存并应用即可。
-uci set firewall.@zone[1].input='ACCEPT'
+# 放开 WAN 区域入站，方便首次从 WAN 侧登录调试 WebUI/SSH
+# 调试完成后请在：网络 → 防火墙 → wan 入站数据 → 拒绝 → 保存并应用
+for z in $(uci show firewall | awk -F'[.=]' '/=zone$/ {print $2}'); do
+	zname=$(uci -q get "firewall.$z.name")
+	if [ "$zname" = "wan" ]; then
+		uci set "firewall.$z.input"='ACCEPT'
+		echo "firewall wan zone input=ACCEPT (debug)" >>$LOGFILE
+		break
+	fi
+done
+# 兼容旧写法（部分镜像 zone 顺序固定）
+uci -q set firewall.@zone[1].input='ACCEPT'
 
 # 设置主机名映射，解决安卓原生 TV 无法联网的问题
 uci add dhcp domain
@@ -70,13 +77,15 @@ esac
 
 # 3. 配置网络
 if [ "$count" -eq 1 ]; then
-    # 单网口设备，DHCP模式
+    # 单网口设备，DHCP 客户端
     uci set network.lan.proto='dhcp'
-    uci delete network.lan.ipaddr
-    uci delete network.lan.netmask
-    uci delete network.lan.gateway
-    uci delete network.lan.dns
+    uci -q delete network.lan.ipaddr
+    uci -q delete network.lan.netmask
+    uci -q delete network.lan.gateway
+    uci -q delete network.lan.dns
+    uci -q set dhcp.lan.ignore='1'
     uci commit network
+    uci commit dhcp
 elif [ "$easepi_r1" -eq 1 ]; then
     # EasePi R1：尽量接近现网（双 WAN + 指定 LAN）
     # 清理可能存在的默认 wan/wan6，改用 wan1/wan2 命名
@@ -95,21 +104,16 @@ elif [ "$easepi_r1" -eq 1 ]; then
         echo "Updated br-lan ports: $lan_ifnames" >>$LOGFILE
     fi
 
-    # LAN 172.20.0.1/24（Actions custom_router_ip 可覆盖）
-    IP_VALUE_FILE="/etc/config/custom_router_ip.txt"
-    if [ -f "$IP_VALUE_FILE" ]; then
-        CUSTOM_IP=$(cat "$IP_VALUE_FILE" | tr -d ' \r\n')
-    else
-        CUSTOM_IP="172.20.0.1"
-    fi
-    # 去掉可能已带的 /24
-    CUSTOM_IP=$(echo "$CUSTOM_IP" | cut -d/ -f1)
-    uci set network.lan.proto='static'
+    # LAN / WAN 均默认 DHCP 客户端，便于首次接入调试（可在 LuCI 自行改回静态/PPPoE）
+    uci set network.lan.proto='dhcp'
     uci -q delete network.lan.ipaddr
     uci -q delete network.lan.netmask
-    uci add_list network.lan.ipaddr="${CUSTOM_IP}/24"
+    uci -q delete network.lan.gateway
+    uci -q delete network.lan.dns
     uci set network.lan.ip6assign='60'
-    echo "EasePi R1 LAN ip is ${CUSTOM_IP}/24" >>$LOGFILE
+    # LAN 作为客户端时关闭本机 DHCP 服务，避免与上级抢分配
+    uci -q set dhcp.lan.ignore='1'
+    echo "EasePi R1 LAN proto=dhcp (client); dhcp.lan.ignore=1" >>$LOGFILE
 
     # wan1 = eth5（主上行，metric 10）
     uci set network.wan1=interface
@@ -127,10 +131,9 @@ elif [ "$easepi_r1" -eq 1 ]; then
         uci set network.wan1.auto='1'
         echo "EasePi R1 wan1 PPPoE configured (credentials from Actions)." >>$LOGFILE
     else
-        # 未在 Actions 勾选 PPPoE：先 DHCP，刷后可在 LuCI 改回 PPPoE
         uci set network.wan1.proto='dhcp'
         uci set network.wan1.ipv6='auto'
-        echo "EasePi R1 wan1 DHCP placeholder; set PPPoE after flash if needed." >>$LOGFILE
+        echo "EasePi R1 wan1 proto=dhcp" >>$LOGFILE
     fi
 
     # wan2 = eth0（副上行 DHCP，metric 20）
@@ -151,7 +154,7 @@ elif [ "$easepi_r1" -eq 1 ]; then
     uci set network.tailscale.proto='none'
     uci set network.tailscale.device='tailscale0'
 
-    # 防火墙 wan 区挂上 wan1/wan2
+    # 防火墙 wan 区挂上 wan1/wan2，并再次确认入站 ACCEPT
     for z in $(uci show firewall | awk -F'[.=]' '/=zone$/ {print $2}'); do
         zname=$(uci -q get "firewall.$z.name")
         if [ "$zname" = "wan" ]; then
@@ -159,7 +162,8 @@ elif [ "$easepi_r1" -eq 1 ]; then
             uci add_list "firewall.$z.network"='wan1'
             uci add_list "firewall.$z.network"='wan2'
             uci add_list "firewall.$z.network"='wan2_v6'
-            echo "firewall wan zone -> wan1/wan2" >>$LOGFILE
+            uci set "firewall.$z.input"='ACCEPT'
+            echo "firewall wan zone -> wan1/wan2, input=ACCEPT" >>$LOGFILE
             break
         fi
     done
@@ -167,50 +171,37 @@ elif [ "$easepi_r1" -eq 1 ]; then
     uci set system.@system[0].hostname='ImmortalWrt-shlt'
     uci commit system
     uci commit network
+    uci commit dhcp
     uci commit firewall
 elif [ "$count" -gt 1 ]; then
-    # 多网口设备配置
-    # 配置WAN
+    # 多网口设备：WAN/LAN 均默认 DHCP 客户端，便于首次调试
     uci set network.wan=interface
     uci set network.wan.device="$wan_ifname"
     uci set network.wan.proto='dhcp'
 
-    # 配置WAN6
     uci set network.wan6=interface
     uci set network.wan6.device="$wan_ifname"
     uci set network.wan6.proto='dhcpv6'
 
-    # 查找 br-lan 设备 section
     section=$(uci show network | awk -F '[.=]' '/\.@?device\[\d+\]\.name=.br-lan.$/ {print $2; exit}')
     if [ -z "$section" ]; then
         echo "error：cannot find device 'br-lan'." >>$LOGFILE
     else
-        # 删除原有ports
         uci -q delete "network.$section.ports"
-        # 添加LAN接口端口
         for port in $lan_ifnames; do
             uci add_list "network.$section.ports"="$port"
         done
         echo "Updated br-lan ports: $lan_ifnames" >>$LOGFILE
     fi
 
-    # LAN口设置静态IP
-    uci set network.lan.proto='static'
-    # 多网口设备 支持修改为别的管理后台地址 在Github Action 的UI上自行输入即可 
-    uci set network.lan.netmask='255.255.255.0'
-    # 设置路由器管理后台地址
-    IP_VALUE_FILE="/etc/config/custom_router_ip.txt"
-    if [ -f "$IP_VALUE_FILE" ]; then
-        CUSTOM_IP=$(cat "$IP_VALUE_FILE")
-        # 用户在UI上设置的路由器后台管理地址
-        uci set network.lan.ipaddr=$CUSTOM_IP
-        echo "custom router ip is $CUSTOM_IP" >> $LOGFILE
-    else
-        uci set network.lan.ipaddr='192.168.100.1'
-        echo "default router ip is 192.168.100.1" >> $LOGFILE
-    fi
+    uci set network.lan.proto='dhcp'
+    uci -q delete network.lan.ipaddr
+    uci -q delete network.lan.netmask
+    uci -q delete network.lan.gateway
+    uci -q delete network.lan.dns
+    uci -q set dhcp.lan.ignore='1'
+    echo "multi-nic LAN/WAN proto=dhcp (client); dhcp.lan.ignore=1" >>$LOGFILE
 
-    # PPPoE设置
     echo "enable_pppoe value: $enable_pppoe" >>$LOGFILE
     if [ "$enable_pppoe" = "yes" ]; then
         echo "PPPoE enabled, configuring..." >>$LOGFILE
@@ -222,10 +213,11 @@ elif [ "$count" -gt 1 ]; then
         uci set network.wan6.proto='none'
         echo "PPPoE config done." >>$LOGFILE
     else
-        echo "PPPoE not enabled." >>$LOGFILE
+        echo "PPPoE not enabled; WAN remains dhcp." >>$LOGFILE
     fi
 
     uci commit network
+    uci commit dhcp
 fi
 
 # 设置所有网口可访问网页终端
