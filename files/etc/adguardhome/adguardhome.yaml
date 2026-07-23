@@ -127,7 +127,9 @@ filters:
     name: 国内视频/APP广告
     id: 1783669107
 whitelist_filters: []
-user_rules: []
+user_rules:
+  - '@@||scmec.vip^'
+  - '@@||cloudsupplychain.com.au^'
 dhcp:
   enabled: false
   interface_name: ""
