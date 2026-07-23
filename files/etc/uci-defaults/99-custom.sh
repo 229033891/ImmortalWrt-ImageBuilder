@@ -104,16 +104,26 @@ elif [ "$easepi_r1" -eq 1 ]; then
         echo "Updated br-lan ports: $lan_ifnames" >>$LOGFILE
     fi
 
-    # LAN / WAN 均默认 DHCP 客户端，便于首次接入调试（可在 LuCI 自行改回静态/PPPoE）
-    uci set network.lan.proto='dhcp'
+    # LAN：静态管理 IP + 对本网段开启 DHCP 服务器；WAN：DHCP 客户端
+    IP_VALUE_FILE="/etc/config/custom_router_ip.txt"
+    if [ -f "$IP_VALUE_FILE" ]; then
+        CUSTOM_IP=$(cat "$IP_VALUE_FILE" | tr -d ' \r\n')
+    else
+        CUSTOM_IP="192.168.100.1"
+    fi
+    CUSTOM_IP=$(echo "$CUSTOM_IP" | cut -d/ -f1)
+    uci set network.lan.proto='static'
     uci -q delete network.lan.ipaddr
     uci -q delete network.lan.netmask
     uci -q delete network.lan.gateway
     uci -q delete network.lan.dns
+    uci add_list network.lan.ipaddr="${CUSTOM_IP}/24"
     uci set network.lan.ip6assign='60'
-    # LAN 作为客户端时关闭本机 DHCP 服务，避免与上级抢分配
-    uci -q set dhcp.lan.ignore='1'
-    echo "EasePi R1 LAN proto=dhcp (client); dhcp.lan.ignore=1" >>$LOGFILE
+    uci -q set dhcp.lan.ignore='0'
+    uci -q set dhcp.lan.start='100'
+    uci -q set dhcp.lan.limit='150'
+    uci -q set dhcp.lan.leasetime='12h'
+    echo "EasePi R1 LAN static ${CUSTOM_IP}/24 + DHCP server on" >>$LOGFILE
 
     # wan1 = eth5（主上行，metric 10）
     uci set network.wan1=interface
@@ -174,7 +184,7 @@ elif [ "$easepi_r1" -eq 1 ]; then
     uci commit dhcp
     uci commit firewall
 elif [ "$count" -gt 1 ]; then
-    # 多网口设备：WAN/LAN 均默认 DHCP 客户端，便于首次调试
+    # 多网口：WAN=DHCP 客户端；LAN=静态管理 IP + DHCP 服务器
     uci set network.wan=interface
     uci set network.wan.device="$wan_ifname"
     uci set network.wan.proto='dhcp'
@@ -194,13 +204,22 @@ elif [ "$count" -gt 1 ]; then
         echo "Updated br-lan ports: $lan_ifnames" >>$LOGFILE
     fi
 
-    uci set network.lan.proto='dhcp'
-    uci -q delete network.lan.ipaddr
-    uci -q delete network.lan.netmask
-    uci -q delete network.lan.gateway
-    uci -q delete network.lan.dns
-    uci -q set dhcp.lan.ignore='1'
-    echo "multi-nic LAN/WAN proto=dhcp (client); dhcp.lan.ignore=1" >>$LOGFILE
+    uci set network.lan.proto='static'
+    uci set network.lan.netmask='255.255.255.0'
+    IP_VALUE_FILE="/etc/config/custom_router_ip.txt"
+    if [ -f "$IP_VALUE_FILE" ]; then
+        CUSTOM_IP=$(cat "$IP_VALUE_FILE" | tr -d ' \r\n')
+        uci set network.lan.ipaddr=$CUSTOM_IP
+        echo "custom router ip is $CUSTOM_IP" >>$LOGFILE
+    else
+        uci set network.lan.ipaddr='192.168.100.1'
+        echo "default router ip is 192.168.100.1" >>$LOGFILE
+    fi
+    uci -q set dhcp.lan.ignore='0'
+    uci -q set dhcp.lan.start='100'
+    uci -q set dhcp.lan.limit='150'
+    uci -q set dhcp.lan.leasetime='12h'
+    echo "multi-nic LAN static + DHCP server; WAN dhcp" >>$LOGFILE
 
     echo "enable_pppoe value: $enable_pppoe" >>$LOGFILE
     if [ "$enable_pppoe" = "yes" ]; then
