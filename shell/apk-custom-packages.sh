@@ -5,7 +5,7 @@
 
 # ---------- EasePi R1（ImmortalWrt-shlt）现网对齐预装包 ----------
 # 说明：openssh-sftp-server 已在 rockchip/build25.sh 默认 PACKAGES 中，此处不再重复
-# AdGuardHome 体积较大；rootfs 建议 Actions 填 2048。若不需要可注释下一行。
+# AdGuardHome 体积较大；rootfs 默认 1024，空间紧张时可加大或注释下一行。
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES adguardhome luci-app-adguardhome"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-samba4 luci-i18n-samba4-zh-cn samba4-server samba4-utils"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-tailscale-community luci-i18n-tailscale-community-zh-cn tailscale"

@@ -87,9 +87,9 @@ on:
         required: true
         default: "172.20.0.1"
       rootfs_partsize:
-        description: '设置软件包大小 单位(MB)（EasePi 建议 2048）'
+        description: '设置软件包大小 单位(MB)（当前默认 1024）'
         required: true
-        default: '2048'
+        default: '1024'
       enable_store:
         description: "集成 store 商店"
         required: false
