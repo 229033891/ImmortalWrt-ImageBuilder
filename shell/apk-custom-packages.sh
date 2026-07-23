@@ -10,11 +10,8 @@ CUSTOM_PACKAGES="$CUSTOM_PACKAGES adguardhome luci-app-adguardhome"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-samba4 luci-i18n-samba4-zh-cn samba4-server samba4-utils"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-tailscale-community luci-i18n-tailscale-community-zh-cn tailscale"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES easytier luci-app-easytier"
-# OpenVPN：客户端 LuCI + 引擎；勿加 luci-app-openvpn-server（25.12 与 openvpn 配置文件冲突）
+# OpenVPN 仅客户端（引擎 + LuCI）；不集成 luci-app-openvpn-server（25.12 配置冲突）
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES openvpn-openssl luci-app-openvpn luci-i18n-openvpn-zh-cn"
-# 兜底远程调试：frpc 反向隧道（设备主动连你的公网 VPS；Tailscale/OpenVPN 全挂且仍有外网时可用）
-# 刷机后在 LuCI 填 frps 地址/token，勿把密钥写进固件仓库
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-frpc-zh-cn"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES rclone fuse3-utils kmod-fuse"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES ddns-go"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES shadow-useradd shadow-usermod shadow-chpasswd shadow-common"
