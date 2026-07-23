@@ -4,13 +4,13 @@
 LOGFILE="/etc/config/uci-defaults-log.txt"
 echo "Starting 99-custom.sh at $(date)" >>$LOGFILE
 
-# LuCI/SSH 默认 root 密码：ipassword（刷机后请尽快修改）
+# LuCI/SSH 默认 root 密码：password（刷机后请尽快修改）
 if command -v chpasswd >/dev/null 2>&1; then
-	echo 'root:ipassword' | chpasswd
-	echo "root password set to ipassword via chpasswd" >>$LOGFILE
+	echo 'root:password' | chpasswd
+	echo "root password set to password via chpasswd" >>$LOGFILE
 elif command -v passwd >/dev/null 2>&1; then
-	printf '%s\n%s\n' ipassword ipassword | passwd root >/dev/null 2>&1
-	echo "root password set to ipassword via passwd" >>$LOGFILE
+	printf '%s\n%s\n' password password | passwd root >/dev/null 2>&1
+	echo "root password set to password via passwd" >>$LOGFILE
 else
 	echo "warn: cannot set root password (no chpasswd/passwd)" >>$LOGFILE
 fi
