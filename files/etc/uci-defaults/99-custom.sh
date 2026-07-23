@@ -278,4 +278,21 @@ if [ -f /usr/bin/quickfile ]; then
     echo "fix quickfile nginx config" >>$LOGFILE
 fi
 
+# AdGuard Home：DHCP 下发路由器 LAN IP 为 DNS（dnsmasq DNS 已在 97-adguardhome.sh 关闭）
+if [ -f /etc/adguardhome/adguardhome.yaml ]; then
+    lan_ip=$(uci -q get network.lan.ipaddr 2>/dev/null)
+    lan_ip=$(echo "$lan_ip" | awk '{print $1}' | cut -d/ -f1)
+    if [ -n "$lan_ip" ] && [ "$(uci -q get dhcp.lan.ignore)" != "1" ]; then
+        while uci -q delete dhcp.lan.dhcp_option 2>/dev/null; do :; done
+        uci add_list dhcp.lan.dhcp_option="6,$lan_ip"
+        uci commit dhcp
+        /etc/init.d/dnsmasq reload 2>/dev/null || /etc/init.d/dnsmasq restart 2>/dev/null
+        echo "DHCP option 6 (DNS) -> $lan_ip for AdGuard Home" >>$LOGFILE
+    fi
+    if [ -x /etc/init.d/adguardhome ]; then
+        /etc/init.d/adguardhome start
+        echo "adguardhome started after network/dhcp config" >>$LOGFILE
+    fi
+fi
+
 exit 0
