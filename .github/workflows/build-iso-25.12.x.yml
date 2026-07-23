@@ -121,11 +121,19 @@ jobs:
            <img src="https://img.shields.io/badge/若下载慢可套用国内加速站下载-FC7C0D?logo=github&logoColor=fff&labelColor=000&style=for-the-badge"/>
           </a>
 
-          - 💿 **产物**: custom-installer-x86_64.iso（启动后执行 \`ddd\` 安装）
+          - 💿 **产物**: custom-installer-x86_64.iso
           - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
           - 👤 **用户名**: root
           - 🔑 **密码**: password
           - 📦 **rootfs**: ${{ github.event.inputs.profile }} MB
+
+          #### 安装步骤（摘要）
+          1. 虚拟机固件选 **EFI**，挂载本 ISO，硬盘建议 ≥8GB
+          2. 从光驱启动后，命令行输入 \`ddd\`，选择目标磁盘写入
+          3. 关机并**卸下 ISO**，从硬盘启动
+          4. 等待 1–2 分钟后访问后台；AdGuard: \`http://IP:3000\`（admin/admin）
+
+          详细说明见仓库：[docs/ISO-INSTALL.md](https://github.com/229033891/ImmortalWrt-ImageBuilder/blob/master/docs/ISO-INSTALL.md)
 
           #### 不带 Docker
           EOF
